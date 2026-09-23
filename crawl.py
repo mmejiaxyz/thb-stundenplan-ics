@@ -213,7 +213,7 @@ def parse_week(rows):
     return events
 
 
-def parse_event(raw):
+def parse_event(raw, stem):
     lines = [ln.strip() for ln in raw["text"].split("\n")]
     lines = [ln for ln in lines if ln]
     if not lines:
@@ -252,7 +252,7 @@ def parse_event(raw):
         "summary": title,
         "location": room,
         "description": description,
-        "uid": "%s-%s" % (raw["date"].isoformat(), raw["id"]),
+        "uid": "%s-%s-%s" % (stem, raw["date"].isoformat(), raw["id"]),
     }
 
 
@@ -341,6 +341,7 @@ def is_enrolled(title, courses):
 
 
 def main():
+    merged = []
     for spec in SEMESTERS:
         stem, url, courses = spec["stem"], spec["url"], spec["courses"]
         page = fetch(url)
@@ -359,17 +360,21 @@ def main():
             events.extend(parse_week(rows))
 
         events.sort(key=lambda e: (e["date"], e["start"]))
-        parsed = [p for p in (parse_event(e) for e in events) if p]
+        parsed = [p for p in (parse_event(e, stem) for e in events) if p]
         included = [e for e in parsed if is_enrolled(e["summary"], courses)]
         excluded = [e["summary"] for e in parsed if not is_enrolled(e["summary"], courses)]
 
-        out = stem + ".ics"
-        with open(out, "w", encoding="utf-8") as f:
-            f.write(build_ics(included))
+        merged.extend(included)
         print(
-            "Wrote %s (%d of %d events, %d weeks) - excluded: %s"
-            % (out, len(included), len(parsed), len(weeks), ", ".join(sorted(set(excluded))))
+            "%s: %d of %d events kept (%d weeks) - excluded: %s"
+            % (stem, len(included), len(parsed), len(weeks), ", ".join(sorted(set(excluded))))
         )
+
+    merged.sort(key=lambda e: (e["date"], e["start"], e["summary"]))
+    out = "stundenplan.ics"
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(build_ics(merged))
+    print("Wrote %s (%d combined events)" % (out, len(merged)))
 
 
 if __name__ == "__main__":
