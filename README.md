@@ -48,19 +48,22 @@ Requires only the Python standard library. It writes `*.ics` files into the repo
      Other → Add Subscribed Calendar → paste the URL. Refreshes via the app's update
      interval.
 
-## Adding more schedules
+## Schedules
 
-Edit `SEMESTERS` in `crawl.py` with `("name", "https://…/stundenplan/…/")` entries and
-commit. Each gets its own `.ics` file.
+Each entry in `SEMESTERS` (in `crawl.py`) is a `{stem, url, courses}` dict and produces
+its own `.ics`:
+
+| File | Source | Courses included |
+|---|---|---|
+| `interactive-media-master-1-semester.ics` | Interactive Media M.Sc., 1. Sem | Motion graphics, Creative technologies, Media theories, Interactive products and services, Projekt 1 |
+| `informatik-bachelor-1-semester-1-gruppe.ics` | Informatik B.Sc., 1. Sem, Gruppe 1 | Einführung in die praktische Informatik (V + Ü) |
 
 ## Filtering to your enrolled courses
 
-By default only the courses listed in `ENROLLED_COURSES` in `crawl.py` are exported
-(currently: Motion graphics, Creative technologies, Media theories, Interactive
-products and services, Projekt 1). Entries are matched case-insensitively as
-substrings of the course title — note `projekt 1` is used (not just `projekt`) so the
-elective *Fortgeschrittenes Projektmanagement* stays excluded. Edit the list to match
-your registration and commit.
+`courses` entries are matched case-insensitively as substrings of the course title
+(e.g. `projekt 1`, not just `projekt`, so the elective *Fortgeschrittenes
+Projektmanagement* stays out; `einführung in die praktische informatik` matches both
+the *V* and *Ü* forms). Edit the lists to match your registration and commit.
 
 ## Notes
 

@@ -15,22 +15,29 @@ from datetime import date, datetime, timedelta
 
 BASE = "https://informatik.th-brandenburg.de"
 
-# Only these enrolled courses end up in the .ics.
-# Matched case-insensitively as substrings of the course title.
-ENROLLED_COURSES = [
-    "motion graphics",
-    "creative technologies",
-    "media theories",
-    "interactive products and services",
-    "projekt 1",
-]
-
-# (ics filename stem, page URL)
+# Each semester has its own list of enrolled courses. Only matching events
+# end up in that semester's .ics. Terms are matched case-insensitively as
+# substrings of the course title (e.g. "projekt 1" so the elective
+# "Fortgeschrittenes Projektmanagement" stays out).
 SEMESTERS = [
-    (
-        "interactive-media-master-1-semester",
-        BASE + "/studium/plaene-und-termine/stundenplan/interactive-media-master/1-semester/",
-    ),
+    {
+        "stem": "interactive-media-master-1-semester",
+        "url": BASE + "/studium/plaene-und-termine/stundenplan/interactive-media-master/1-semester/",
+        "courses": [
+            "motion graphics",
+            "creative technologies",
+            "media theories",
+            "interactive products and services",
+            "projekt 1",
+        ],
+    },
+    {
+        "stem": "informatik-bachelor-1-semester-1-gruppe",
+        "url": BASE + "/studium/plaene-und-termine/stundenplan/informatik-bachelor/1-semester/1-gruppe/",
+        "courses": [
+            "einführung in die praktische informatik",
+        ],
+    },
 ]
 
 USER_AGENT = (
@@ -328,13 +335,14 @@ def sanitize(text):
     return text
 
 
-def is_enrolled(title):
+def is_enrolled(title, courses):
     norm = re.sub(r"\s+", " ", title).lower()
-    return any(course in norm for course in ENROLLED_COURSES)
+    return any(course in norm for course in courses)
 
 
 def main():
-    for stem, url in SEMESTERS:
+    for spec in SEMESTERS:
+        stem, url, courses = spec["stem"], spec["url"], spec["courses"]
         page = fetch(url)
         iframe = extract_iframe_src(page)
         print("Schedule source:", iframe, file=sys.stderr)
@@ -352,8 +360,8 @@ def main():
 
         events.sort(key=lambda e: (e["date"], e["start"]))
         parsed = [p for p in (parse_event(e) for e in events) if p]
-        included = [e for e in parsed if is_enrolled(e["summary"])]
-        excluded = [e["summary"] for e in parsed if not is_enrolled(e["summary"])]
+        included = [e for e in parsed if is_enrolled(e["summary"], courses)]
+        excluded = [e["summary"] for e in parsed if not is_enrolled(e["summary"], courses)]
 
         out = stem + ".ics"
         with open(out, "w", encoding="utf-8") as f:
