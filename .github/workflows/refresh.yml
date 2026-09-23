@@ -30,7 +30,11 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to the schedule."
-          else
-            git commit -m "Refresh schedule $(date -u +%F)"
-            git push
+            exit 0
           fi
+          git commit -m "Refresh schedule $(date -u +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && break
+            sleep 5
+          done
+          git push
