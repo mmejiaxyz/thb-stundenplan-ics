@@ -41,6 +41,21 @@ Each entry in `SEMESTERS` (in `crawl.py`) is a `{stem, url, courses}` dict:
 Projektmanagement* stays out; `einführung in die praktische informatik` matches both
 the *V* and *Ü* forms). Edit the lists to match your registration and commit.
 
+## Self-verification
+
+Before writing `stundenplan.ics` the crawler verifies every day of the combined
+schedule and **fails loudly (exit 1) if any check fails**:
+
+- each course keeps a single weekday across the semester,
+- no duplicate event UIDs,
+- no two classes overlap in time on the same day,
+- every event has `end > start`,
+- each parsed day header matches the real calendar weekday.
+
+It also prints a per-day report of every generated event. Because the daily GitHub
+Actions run fails on violations, a week-day mapping regression surfaces in the run log
+instead of silently producing a wrong calendar.
+
 ## Setup (GitHub Pages hosting)
 
 1. Push this repo to GitHub:

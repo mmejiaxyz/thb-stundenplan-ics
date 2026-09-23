@@ -11,6 +11,7 @@ import html.parser
 import re
 import sys
 import urllib.request
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 BASE = "https://informatik.th-brandenburg.de"
@@ -194,6 +195,8 @@ def parse_week(rows, ws):
         if not m:
             continue
         d = date(2000 + int(m.group(4)), int(m.group(3)), int(m.group(2)))
+        if d.weekday() != WEEKDAY_DE[m.group(1)]:
+            raise ValueError("Header weekday mismatch: %r" % cell.text.strip())
         x0 = sum(ws[:c])
         x1 = x0 + sum(ws[c:c + cell.colspan])
         day_ranges.append((d, x0, x1))
@@ -357,6 +360,63 @@ def is_enrolled(title, courses):
     return any(course in norm for course in courses)
 
 
+WEEKDAY_DE = {"Mo": 0, "Di": 1, "Mi": 2, "Do": 3, "Fr": 4, "Sa": 5, "So": 6}
+
+
+def verify_events(events):
+    """Self-check every day's events. Returns a list of issues (non-empty -> fail)."""
+    issues = []
+
+    # 1. unique UIDs
+    seen = set()
+    for e in events:
+        if e["uid"] in seen:
+            issues.append("Duplicate UID: %s (%s)" % (e["uid"], e["summary"]))
+        seen.add(e["uid"])
+
+    # 2. each course must keep a single weekday across the semester
+    by_course = defaultdict(set)
+    for e in events:
+        by_course[(e["summary"], e["description"])].add(e["date"].strftime("%A"))
+    for (course, desc), days in sorted(by_course.items()):
+        if len(days) > 1:
+            issues.append(
+                "Course %r (%s) appears on multiple weekdays: %s"
+                % (course, desc, ", ".join(sorted(days)))
+            )
+
+    # 3. per-day overlap and time sanity
+    by_day = defaultdict(list)
+    for e in events:
+        by_day[e["date"]].append((e["start"], e["end"], e["summary"], e["uid"]))
+    for d, evs in sorted(by_day.items()):
+        evs.sort()
+        for i in range(len(evs)):
+            if evs[i][1] <= evs[i][0]:
+                issues.append("%s %s: end %s <= start %s" % (d, evs[i][2], evs[i][1], evs[i][0]))
+            if i and evs[i - 1][1] > evs[i][0]:
+                issues.append(
+                    "%s overlap: %s %s-%s  vs  %s %s-%s"
+                    % (d, evs[i - 1][2], evs[i - 1][0], evs[i - 1][1], evs[i][2], evs[i][0], evs[i][1])
+                )
+
+    return issues
+
+
+def report_daily(events):
+    by_day = defaultdict(list)
+    for e in events:
+        by_day[e["date"]].append(e)
+    print("\n=== Daily verification ===")
+    for d in sorted(by_day):
+        evs = sorted(by_day[d], key=lambda e: e["start"])
+        print("%s (%s): %d event(s)" % (d, d.strftime("%A"), len(evs)))
+        for e in evs:
+            loc = " @ " + e["location"] if e["location"] else ""
+            print("   %s-%s  %s%s" % (e["start"], e["end"], e["summary"], loc))
+    print()
+
+
 def main():
     merged = []
     for spec in SEMESTERS:
@@ -389,6 +449,16 @@ def main():
         )
 
     merged.sort(key=lambda e: (e["date"], e["start"], e["summary"]))
+
+    issues = verify_events(merged)
+    if issues:
+        print("VERIFICATION FAILED - %d issue(s):" % len(issues), file=sys.stderr)
+        for issue in issues:
+            print("  ! %s" % issue, file=sys.stderr)
+        sys.exit(1)
+
+    report_daily(merged)
+
     out = "stundenplan.ics"
     with open(out, "w", encoding="utf-8") as f:
         f.write(build_ics(merged))
