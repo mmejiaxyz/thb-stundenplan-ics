@@ -86,8 +86,10 @@ class WeekParser(html.parser.HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.tables = []  # list of week tables; each is a list of rows
+        self.colwidths = []  # parallel list of <col width> per table
         self.in_week = False
         self.cur_table = None
+        self.cur_widths = None
         self.cur_row = None
         self.cur_cell = None
 
@@ -97,6 +99,9 @@ class WeekParser(html.parser.HTMLParser):
             self.in_week = True
         elif tag == "table" and self.in_week:
             self.cur_table = []
+            self.cur_widths = []
+        elif tag == "col" and self.cur_widths is not None:
+            self.cur_widths.append(int(a.get("width", 0)))
         elif tag == "tr" and self.cur_table is not None:
             self.cur_row = []
         elif tag == "td" and self.cur_row is not None:
@@ -121,10 +126,14 @@ class WeekParser(html.parser.HTMLParser):
             self.cur_row = None
         elif tag == "table" and self.cur_table is not None:
             self.tables.append(self.cur_table)
+            self.colwidths.append(self.cur_widths or [])
             self.cur_table = None
+            self.cur_widths = None
 
     def handle_startendtag(self, tag, attrs):
-        if tag == "br" and self.cur_cell is not None:
+        if tag == "col" and self.cur_widths is not None:
+            self.cur_widths.append(int(dict(attrs).get("width", 0)))
+        elif tag == "br" and self.cur_cell is not None:
             self.cur_cell.data.append("\n")
 
     def handle_data(self, data):
@@ -159,7 +168,7 @@ DAY_RE = re.compile(r"^(Mo|Di|Mi|Do|Fr|Sa|So),\s*(\d{2})\.(\d{2})\.(\d{2})$")
 TIME_RE = re.compile(r"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*Uhr")
 
 
-def parse_week(rows):
+def parse_week(rows, ws):
     grid = build_grid(rows)
     if not grid:
         return []
@@ -173,14 +182,21 @@ def parse_week(rows):
     if header_row is None:
         return []
 
-    day_by_col = {}
+    # Day header cells -> physical x ranges (dedup by cell id; a colspan cell
+    # appears once per column it spans in the expanded grid).
+    day_ranges = []  # (date, x0, x1)
+    seen_hdr = set()
     for c, cell in enumerate(grid[header_row]):
-        if isinstance(cell, Cell) and cell.cls == "t":
-            m = DAY_RE.match(cell.text.strip())
-            if m:
-                d = date(2000 + int(m.group(4)), int(m.group(3)), int(m.group(2)))
-                for i in range(cell.colspan):
-                    day_by_col[c + i] = d
+        if not (isinstance(cell, Cell) and cell.cls == "t") or id(cell) in seen_hdr:
+            continue
+        seen_hdr.add(id(cell))
+        m = DAY_RE.match(cell.text.strip())
+        if not m:
+            continue
+        d = date(2000 + int(m.group(4)), int(m.group(3)), int(m.group(2)))
+        x0 = sum(ws[:c])
+        x1 = x0 + sum(ws[c:c + cell.colspan])
+        day_ranges.append((d, x0, x1))
 
     events = []
     seen = set()
@@ -191,18 +207,19 @@ def parse_week(rows):
             if id(cell) in seen:
                 continue
             seen.add(id(cell))
-            col = next(
-                (c for c, x in enumerate(row) if x is cell),
-                None,
-            )
-            if col is None or col not in day_by_col:
+            cols = [c for c, x in enumerate(row) if x is cell]
+            if not cols:
+                continue
+            xc = (sum(ws[:min(cols)]) + sum(ws[:max(cols) + 1])) / 2.0
+            day = next((d for d, x0, x1 in day_ranges if x0 <= xc <= x1), None)
+            if day is None:
                 continue
             tm = TIME_RE.search(cell.text)
             if not tm:
                 continue
             events.append(
                 {
-                    "date": day_by_col[col],
+                    "date": day,
                     "start": (int(tm.group(1)), int(tm.group(2))),
                     "end": (int(tm.group(3)), int(tm.group(4))),
                     "id": cell.cell_id,
@@ -356,8 +373,9 @@ def main():
         weeks = [t for t in parser.tables if t]
 
         events = []
-        for rows in weeks:
-            events.extend(parse_week(rows))
+        for rows, ws in zip(parser.tables, parser.colwidths):
+            if rows:
+                events.extend(parse_week(rows, ws))
 
         events.sort(key=lambda e: (e["date"], e["start"]))
         parsed = [p for p in (parse_event(e, stem) for e in events) if p]
