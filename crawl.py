@@ -141,6 +141,8 @@ def build_grid(rows):
     pending = {}  # future row -> set of occupied cols
     for r, cells in enumerate(rows):
         grid.append([None] * 40)
+        for c in pending.get(r, ()):
+            grid[r][c] = "occupied"
         col = 0
         for cell in cells:
             while col < len(grid[r]) and grid[r][col] is not None:
@@ -150,8 +152,6 @@ def build_grid(rows):
             for rr in range(1, cell.rowspan):
                 pending.setdefault(r + rr, set()).update(range(col, col + cell.colspan))
             col += cell.colspan
-        for c in pending.get(r, ()):
-            grid[r][c] = "occupied"
     return grid
 
 
