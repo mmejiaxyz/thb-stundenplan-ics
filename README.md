@@ -53,6 +53,15 @@ Requires only the Python standard library. It writes `*.ics` files into the repo
 Edit `SEMESTERS` in `crawl.py` with `("name", "https://…/stundenplan/…/")` entries and
 commit. Each gets its own `.ics` file.
 
+## Filtering to your enrolled courses
+
+By default only the courses listed in `ENROLLED_COURSES` in `crawl.py` are exported
+(currently: Motion graphics, Creative technologies, Media theories, Interactive
+products and services, Projekt 1). Entries are matched case-insensitively as
+substrings of the course title — note `projekt 1` is used (not just `projekt`) so the
+elective *Fortgeschrittenes Projektmanagement* stays excluded. Edit the list to match
+your registration and commit.
+
 ## Notes
 
 - Times are converted to UTC; DST (CEST/CET) is handled automatically.

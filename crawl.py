@@ -15,6 +15,16 @@ from datetime import date, datetime, timedelta
 
 BASE = "https://informatik.th-brandenburg.de"
 
+# Only these enrolled courses end up in the .ics.
+# Matched case-insensitively as substrings of the course title.
+ENROLLED_COURSES = [
+    "motion graphics",
+    "creative technologies",
+    "media theories",
+    "interactive products and services",
+    "projekt 1",
+]
+
 # (ics filename stem, page URL)
 SEMESTERS = [
     (
@@ -318,6 +328,11 @@ def sanitize(text):
     return text
 
 
+def is_enrolled(title):
+    norm = re.sub(r"\s+", " ", title).lower()
+    return any(course in norm for course in ENROLLED_COURSES)
+
+
 def main():
     for stem, url in SEMESTERS:
         page = fetch(url)
@@ -337,11 +352,16 @@ def main():
 
         events.sort(key=lambda e: (e["date"], e["start"]))
         parsed = [p for p in (parse_event(e) for e in events) if p]
+        included = [e for e in parsed if is_enrolled(e["summary"])]
+        excluded = [e["summary"] for e in parsed if not is_enrolled(e["summary"])]
 
         out = stem + ".ics"
         with open(out, "w", encoding="utf-8") as f:
-            f.write(build_ics(parsed))
-        print("Wrote %s (%d events, %d weeks)" % (out, len(parsed), len(weeks)))
+            f.write(build_ics(included))
+        print(
+            "Wrote %s (%d of %d events, %d weeks) - excluded: %s"
+            % (out, len(included), len(parsed), len(weeks), ", ".join(sorted(set(excluded))))
+        )
 
 
 if __name__ == "__main__":
