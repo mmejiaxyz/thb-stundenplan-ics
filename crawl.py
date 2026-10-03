@@ -28,7 +28,7 @@ SEMESTERS = [
             "motion graphics",
             "creative technologies",
             "media theories",
-            "interactive products and services",
+            # "interactive products and services",
             "projekt 1",
             "fortgeschrittenes projektmanagement",
         ],
