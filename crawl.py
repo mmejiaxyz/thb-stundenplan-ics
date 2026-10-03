@@ -29,7 +29,7 @@ SEMESTERS = [
             "creative technologies",
             "media theories",
             # "interactive products and services",
-            "projekt 1",
+            # "projekt 1",
             "fortgeschrittenes projektmanagement",
         ],
     },
