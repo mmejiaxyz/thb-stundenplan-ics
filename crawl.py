@@ -47,6 +47,11 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 )
 
+# Campus address for LOCATION so calendar apps can geocode and
+# calculate travel time. All enrolled courses (Informatik, Interactive
+# Media) are taught on the main campus.
+THB_ADDRESS = "Magdeburger Straße 50, 14770 Brandenburg an der Havel"
+
 ROOM_RE = re.compile(r"^[A-Za-z]\.\d")
 
 
@@ -342,7 +347,9 @@ def build_ics(events):
             "SUMMARY:%s" % sanitize(e["summary"]),
         ]
         if e["location"]:
-            lines.append("LOCATION:%s" % sanitize(e["location"]))
+            lines.append("LOCATION:%s, %s" % (sanitize(e["location"]), sanitize(THB_ADDRESS)))
+        elif THB_ADDRESS:
+            lines.append("LOCATION:%s" % sanitize(THB_ADDRESS))
         if e["description"]:
             lines.append("DESCRIPTION:%s" % sanitize(e["description"]))
         lines.append("END:VEVENT")
