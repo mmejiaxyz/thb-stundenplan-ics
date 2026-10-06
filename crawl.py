@@ -265,6 +265,8 @@ def parse_event(raw, stem):
     ).strip()
 
     desc_parts = []
+    if room:
+        desc_parts.append("Raum: " + room)
     if lecturers:
         desc_parts.append("Dozierende: " + ", ".join(lecturers))
     if notes:
@@ -346,9 +348,7 @@ def build_ics(events):
             "DTEND:%s" % ics_datetime(dtend),
             "SUMMARY:%s" % sanitize(e["summary"]),
         ]
-        if e["location"]:
-            lines.append("LOCATION:%s, %s" % (sanitize(e["location"]), sanitize(THB_ADDRESS)))
-        elif THB_ADDRESS:
+        if THB_ADDRESS:
             lines.append("LOCATION:%s" % sanitize(THB_ADDRESS))
         if e["description"]:
             lines.append("DESCRIPTION:%s" % sanitize(e["description"]))
